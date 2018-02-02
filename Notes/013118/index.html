@@ -1,0 +1,133 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Pages</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+circle.target { fill: #5468DA; }
+circle.movable { fill: #1E2F7F; }
+</style>
+</head>
+<body>
+<h3>Notes for Wednesday, January 31</h3>
+
+<div>
+  <ul>
+    <li>Office hours are now posted on Piazza. These may change, make sure to check for updates.</li>
+    <li>A cool source for <a href="https://pigment.shapefactory.co/">color combinations</a></li>
+  </ul>
+</div>
+  
+  <div>
+  </div>
+
+  <div>Inspiration: Edward Tufte popularized <a href="https://en.wikipedia.org/wiki/File:Minard.png">this map by Charles Minard of Napoleon's disastrous Russian invasion</a> as the greatest visual presentation of data ever. How many different variables is Minard presenting? What is he choosing NOT to present? (Is this actually a map?) What elements would you use to copy this "carte figurative" in SVG?
+  </div>
+
+  <div>
+    SVG is an XML specification of vector graphics. Visual elements are represented as tags, which have styles and attributes. 
+  </div>
+  <div>
+    <p>1. Rectangles. How does SVG understand coordinates?</p>
+    <p>The coordinate system starts at the top left corner. Positive <tt>y</tt> values move down towards the bottom. SVG elements are just HTML tags, so we can use CSS to apply styles. In general use classes and the <tt>&lt;style&gt;</tt> block to apply styles, but here I wanted to avoid scrolling up and down. This example uses several important styles for color and transparency. Semi-transparency is really useful for showing density in data.</p>
+    <svg height="400" width="400">
+      <rect x="30" y="100" height="40" width="40" style="fill: blue; stroke: green; stroke-width: 7"/>
+      <rect x="50" y="120" height="40" width="40" style="fill: blue; stroke: red; stroke-width: 7; opacity: 0.7"/>
+    </svg>
+  </div>
+  <div>
+    <p>2. Paths. This is the most complicated SVG element, but also one of the most useful. It contains <a href="https://www.w3.org/TR/SVG/paths.html#PathData">a tiny programming language</a>. Do some experiments on your own to see the effect of L vs M. (Hint: it matters for stroke but not fill.)  Check the API linked above for nifty features like Bezier curves.</p>
+    
+    <svg height="200" width="200">
+      <path d="M 20 20 l 80 0 L 100 100 L 20 100 Z M 110 110 l 80 0 0 80 -80 0 40 -40 z" style="stroke-width: 7; stroke: green; fill: #cfc" />
+    </svg>
+    
+    <p> In-class project: Make a plot like Minard's. Coordinate and color information is included in an HTML comment.</p>
+    <svg height="400" width="600">
+      <path d="M 23 123 L 64 110 114 123 202 106 290 102 360 125 419 106 476  55 524  70 574  42 579  51 520  83 480 73 425 124 364 148 291 122 206 137 108 167  68 163  41 170" style="fill: rgb(225, 204, 172)"/>
+      <path d="M 40 167 L 95 166 147 170 168 176 191 163 230 184 261 178 307 158 367 146 422 125 459 104 506  82 564  96 568  57 578  51 584  61 580  63 576 100 563 108 505  94 465 112 425 131 367 150 310 162 265 182  235 191 227 190 190 166 169 178 149 172  97 169  40 171" style="fill: black"/>
+    </svg>
+    <!-- The following may be useful:
+      rgb(225, 204, 172)
+      23 123  64 110 114 123 202 106 290 102 360 125 419 106 476  55 524  70 574  42 579  51 520  83 480 73 425 124 364 148 291 122 206 137 108 167  68 163  41 170
+      40 167  95 166 147 170 168 176 191 163 230 184 261 178 307 158 367 146 422 125 459 104 506  82 564  96 568  57 578  51 584  61 580  63 576 100 563 108 505  94 465 112 425 131 367 150 310 162 265 182  235 191 227 190 190 166 169 178 149 172  97 169  40 171
+    -->
+  </div>
+  <div>
+    <p>3. Transformations are another useful (but a bit tricky) tool. How do we stretch, rotate, and shift elements, and how does the order of these operations affect the result? Challenge: add rotate() and scale() to the transform block to make the "movable" circle match the "target" circle. Does the order of operations matter?</p>
+    
+    <p>
+      Wrapping all elements in a <tt>translate()</tt> transformation moves the coordinate system. We often want to do this to add a margin around a plot while keeping our mapping from data to x,y positions simple.
+    </p>
+    
+    <p>In the first panel, there is just a circle at 0,0 in the shifted coordinate system, which corresponds to 50,50 in the actual plot. In the second panel I'm using a <tt>translate()</tt> transformation to move the circle to the right. In the third panel I apply two transformations: <tt>scale()</tt> and <tt>translate()</tt>.  <tt>scale()</tt> stretches things -- it's like multiplying all coordinates by a constant. In the fourth panel I'm doing the exact same transformations, but in the opposite order. You can tell that in the first case the scale is applied <i>after</i> the translate: the circle not only gets bigger, it also moves, because its horizontal position is non-zero and is also being scaled. Finally, the last two panels show the effect of <tt>rotate()</tt>. In the first case the circle is rotated 160 degrees clockwise around the 0,0 position (ie the center of the SVG, after the global translation). In the last case, the circle is rotated <i>before</i> it is moved, which has no visible effect.</p>
+    <svg height="100" width="100">
+      <g transform="translate(50,50)">
+        <line x1="-3" x2="3" y1="0" y2="0" style="stroke: black"/>
+        <line y1="-3" y2="3" x1="0" x2="0" style="stroke: black"/>
+        <circle r="8" cx="-25" cy="12" class="target"/>
+        <g transform="">
+          <circle class="movable" r="3" />
+        </g>
+      </g>
+    </svg>
+    <svg height="100" width="100">
+      <g transform="translate(50,50)">
+        <line x1="-3" x2="3" y1="0" y2="0" style="stroke: black"/>
+        <line y1="-3" y2="3" x1="0" x2="0" style="stroke: black"/>
+        <circle r="8" cx="-25" cy="12" class="target"/>
+        <g transform="translate(25,0)">
+          <circle class="movable" r="3" />
+        </g>
+      </g>
+    </svg>
+    <svg height="100" width="100">
+      <g transform="translate(50,50)">
+        <line x1="-3" x2="3" y1="0" y2="0" style="stroke: black"/>
+        <line y1="-3" y2="3" x1="0" x2="0" style="stroke: black"/>
+        <circle r="8" cx="-25" cy="12" class="target"/>
+        <g transform="scale(1.5) translate(25,0)">
+          <circle class="movable" r="3" />
+        </g>
+      </g>
+    </svg>
+    <svg height="100" width="100">
+      <g transform="translate(50,50)">
+        <line x1="-3" x2="3" y1="0" y2="0" style="stroke: black"/>
+        <line y1="-3" y2="3" x1="0" x2="0" style="stroke: black"/>
+        <circle r="8" cx="-25" cy="12" class="target"/>
+        <g transform="translate(25,0) scale(1.5)">
+          <circle class="movable" r="3" />
+        </g>
+      </g>
+    </svg>
+    <svg height="100" width="100">
+      <g transform="translate(50,50)">
+        <line x1="-3" x2="3" y1="0" y2="0" style="stroke: black"/>
+        <line y1="-3" y2="3" x1="0" x2="0" style="stroke: black"/>
+        <circle r="8" cx="-25" cy="12" class="target"/>
+        <g transform="rotate(160) translate(25,0) scale(1.5)">
+          <circle class="movable" r="3" />
+        </g>
+      </g>
+    </svg>
+    <svg height="100" width="100">
+      <g transform="translate(50,50)">
+        <line x1="-3" x2="3" y1="0" y2="0" style="stroke: black"/>
+        <line y1="-3" y2="3" x1="0" x2="0" style="stroke: black"/>
+        <circle r="8" cx="-25" cy="12" class="target"/>
+        <g transform="translate(25,0) rotate(160) scale(1.5)">
+          <circle class="movable" r="3" />
+        </g>
+      </g>
+    </svg>
+    
+  </div>
+  
+
+
+</body>
+</html>
