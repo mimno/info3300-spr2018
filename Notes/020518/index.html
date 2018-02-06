@@ -1,0 +1,172 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+</style>
+</head>
+<body>
+<h3>Notes for Monday, February 5</h3>
+
+<div>
+<ul>
+	<li>Have a local web server running.</li>
+	<li>We are now using <a href="https://d3js.org/">Mike Bostock's d3 library</a>. Read <a href="https://github.com/d3/d3/blob/master/API.md">the documentation</a> to gain superpowers.</li>
+</ul>
+</div>
+
+<div>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="200" id="sblii">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<svg height="400" width="200" id="sbli">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var superbowl = [
+{"Team":"PHL","Plays":14,"Yards":67,"Result":"fg"},
+{"Team":"NE","Plays":9,"Yards":67,"Result":"fg"},
+{"Team":"PHL","Plays":3,"Yards":77,"Result":"td"},
+{"Team":"NE","Plays":8,"Yards":74,"Result":"missed"},
+{"Team":"PHL","Plays":3,"Yards":2,"Result":"punt"},
+{"Team":"NE","Plays":5,"Yards":28,"Result":"downs"},
+{"Team":"PHL","Plays":6,"Yards":65,"Result":"td"},
+{"Team":"NE","Plays":5,"Yards":48,"Result":"fg"},
+{"Team":"PHL","Plays":4,"Yards":32,"Result":"int"},
+{"Team":"NE","Plays":7,"Yards":90,"Result":"td"},
+{"Team":"PHL","Plays":7,"Yards":70,"Result":"td"},
+{"Team":"NE","Plays":5,"Yards":48,"Result":"end"},
+
+{"Team":"NE","Plays":8,"Yards":75,"Result":"td"},
+{"Team":"PHL","Plays":11,"Yards":85,"Result":"td"},
+{"Team":"NE","Plays":7,"Yards":75,"Result":"td"},
+{"Team":"PHL","Plays":8,"Yards":51,"Result":"fg"},
+{"Team":"NE","Plays":10,"Yards":75,"Result":"td"},
+{"Team":"PHL","Plays":14,"Yards":75,"Result":"td"},
+{"Team":"NE","Plays":2,"Yards":3,"Result":"fumble"},
+{"Team":"PHL","Plays":4,"Yards":4,"Result":"fg"},
+{"Team":"NE","Plays":9,"Yards":40,"Result":"end"}
+];
+
+var superbowl51 = [{"Team":"NE","Plays":3,"Yards":9,"Result":"punt"},{"Team":"ATL","Plays":4,"Yards":32,"Result":"punt"},{"Team":"NE","Plays":9,"Yards":41,"Result":"punt"},{"Team":"ATL","Plays":5,"Yards":24,"Result":"punt"},{"Team":"NE","Plays":5,"Yards":53,"Result":"fumble"},{"Team":"ATL","Plays":5,"Yards":71,"Result":"td"},{"Team":"NE","Plays":3,"Yards":8,"Result":"punt"},{"Team":"ATL","Plays":5,"Yards":62,"Result":"td"},{"Team":"NE","Plays":12,"Yards":52,"Result":"int"},{"Team":"NE","Plays":11,"Yards":52,"Result":"fg"},{"Team":"ATL","Plays":3,"Yards":4,"Result":"punt"},{"Team":"NE","Plays":3,"Yards":-2,"Result":"punt"},{"Team":"ATL","Plays":8,"Yards":85,"Result":"td"},{"Team":"NE","Plays":13,"Yards":75,"Result":"td"},{"Team":"ATL","Plays":3,"Yards":-15,"Result":"punt"},{"Team":"NE","Plays":12,"Yards":72,"Result":"fg"},{"Team":"ATL","Plays":3,"Yards":-2,"Result":"fumble"},{"Team":"NE","Plays":5,"Yards":25,"Result":"td"},{"Team":"ATL","Plays":6,"Yards":45,"Result":"punt"},{"Team":"NE","Plays":10,"Yards":91,"Result":"td"},{"Team":"ATL","Plays":4,"Yards":16,"Result":"punt"},{"Team":"NE","Plays":1,"Yards":13,"Result":"end"},{"Team":"NE","Plays":8,"Yards":75,"Result":"td"}];
+
+
+var svg = d3.select("#sblii");
+svg.append("text")
+.attr("x", 170).attr("y", 20)
+.style("fill", "#ccc")
+.text("2018");
+
+// Following the grammar of graphics, our goal is to represent
+// data elements with geometric elements.
+// Scales are functions that create a mapping between variables
+//  and aesthetic attributes of the geometric elements.
+
+// First two linear scales, yards -> x-pixels, index -> y-pixels
+
+// Think of "domain" and "range" as "input" and "output", 
+//  NOT as x and y.
+
+// The domain takes a single argument, an array (NOT two arguments),
+// which represents two inputs. We often choose these to be 
+// reasonable extremes, but the function will still work for
+// values outside these values.
+// The range works the same way: we give it a two-element array.
+
+// In this case if we pass 0 to yardsScale, it will return 100,
+// and if we pass 100, we will get back 190.
+
+var width = svg.attr("width");
+var height = svg.attr("height");
+
+var yardsScale = d3.scaleLinear()
+.domain([0, 100])
+.range([width/2, width-10]); // start at the middle, end near (but not at) the right margin
+var driveScale = d3.scaleLinear()
+.domain([0,superbowl51.length - 1]) // using the length of the longer array
+.range([20, height-20]); // start close to the top, end close to the bottom
+
+// For teams, we do something similar, but the only meaningful
+// inputs will be specific values -- interpolating between
+// NE and PHL makes no sense.
+// For an ordinal scale the domain is a list of values 
+//  and the range is a list of the same length.
+var teamScale = d3.scaleOrdinal()
+.domain(["NE", "PHL", "ATL"])
+.range(["#CC122C","#004851", "#8C8B89"]);
+
+// We can also make our own scale function
+var scoreScale = function (d) {
+  if (d.Result == "td" || d.Result == "fg") {
+    return 1.0;
+  }
+  else {
+    return 0.3;
+  }
+}
+
+// From https://teamcolorcodes.com
+// Patriots Red: #CC122C
+// Eagles Midnight Green: #004851
+
+// In the functional for-loop style, the supplied function
+// is called once for each element of the array. The first
+// argument will be the element itself, the second argument
+// will be the index.
+superbowl.forEach(function (d, i) {
+  svg.append("line")
+  .attr("x1", yardsScale(0))
+  .attr("x2", yardsScale(d.Team == "NE" ? d.Yards : -d.Yards)) // shorter than what we did in class (via CI)
+  .attr("y1", driveScale(i)) // For the height, use the index
+  .attr("y2", driveScale(i))
+  .style("stroke", teamScale(d.Team))
+  .style("stroke-width", 10)
+  .style("opacity", scoreScale(d));
+});
+
+// How does this game compare to previous games? Let's reuse
+// all of these scales to show last year's game.
+
+svg = d3.select("#sbli");
+svg.append("text")
+.attr("x", 170).attr("y", 20)
+.style("fill", "#ccc")
+.text("2017");
+
+superbowl51.forEach(function (d, i) {
+  svg.append("line")
+  .attr("x1", yardsScale(0))
+  .attr("x2", yardsScale(d.Team == "NE" ? d.Yards : -d.Yards)) // shorter than what we did in class (via CI)
+  .attr("y1", driveScale(i)) // For the height, use the index
+  .attr("y2", driveScale(i))
+  .style("stroke", teamScale(d.Team))
+  .style("stroke-width", 10)
+  .style("opacity", scoreScale(d));
+});
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
