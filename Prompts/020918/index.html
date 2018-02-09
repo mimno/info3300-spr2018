@@ -51,6 +51,7 @@ svg.append("text")
 // Define variables outside the scope of the callback function.
 var countryData;
 var rawData, nestedData;
+var popScale, gdpScale, areaScale, internetScale;
 
 // This function will be applied to all rows. Select three columns, change names, and convert strings to numbers.
 function parseLine (line) {
@@ -107,15 +108,15 @@ d3.tsv("CountryProfile.tsv", parseLine, function (error, data) {
   
   var popExtent = d3.extent(countryData,
     function (d) { return d.Population; });
-  console.log(popExtent);
-  var popScale = d3.scaleLog()
+  
+  popScale = d3.scaleLog()
   .domain(popExtent)
   .range([0, 400]);
   
   var gdpExtent = d3.extent(countryData,
     function (d) { return d.GDP; });
-  console.log(gdpExtent);
-  var gdpScale = d3.scaleLog()
+  
+  gdpScale = d3.scaleLog()
   .domain(gdpExtent)
   .range([400, 0]);
     
