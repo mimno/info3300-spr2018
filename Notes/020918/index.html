@@ -1,0 +1,195 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Barlow+Condensed" rel="stylesheet"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Barlow Condensed', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, February 9</h3>
+
+<div>
+<ul>
+  <li>Ads: ACSU/URMC/WICC event Monday at 5:30; WICC <a href="http://tinyurl.com/lunchbunchspring18">lunch bunch</a>.</li>
+  <li><a href="http://www.loc.gov/pictures/resource/ppmsca.33873/?co=anedub">Another approach to massive scale differences by W.E.B. Du Bois</a> and <a href="http://bl.ocks.org/emeeks/3993c03914e81f1d57650292b3001b27">an attempt to recreate it in d3</a>.</li>
+  <li>Lisa Charlotte Rost on <a href="https://blog.datawrapper.de/weekly-chart-lifesatisfaction/">reading scatter plots</a>.</li>
+</ul>
+</div>
+
+<div>
+  <p>Today: More on <a href="https://github.com/d3/d3/blob/master/API.md#scales-d3-scale">scales</a> and <a href="https://github.com/d3/d3-axis">guides</a>.</p>
+  
+  <p>We're working with <a href="http://data.worldbank.org/data-catalog/country-profiles">Country Profile data</a> from the world bank. Here are some of the issues we face:</p>
+  <ul>
+    <li>Ungrouped data. </li>
+    <li>Wordy variables. </li>
+    <li>Missing data. </li>
+    <li>Incorrect data. </li>
+    <li>Data dispersion.</li>
+  </ul>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="400">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+
+svg.append("text")
+.attr("id", "CountryName")
+.attr("x", 30)
+.attr("y", 50)
+.style("font-size", "24pt");
+
+// Define variables outside the scope of the callback function.
+var countryData;
+var rawData, nestedData;
+var popScale, gdpScale, areaScale, internetScale;
+
+// This function will be applied to all rows. Select three columns, change names, and convert strings to numbers.
+function parseLine (line) {
+  return { 
+    Country: line["Country Name"],
+    Variable: line["Series Name"],
+    value: Number(line["2015 [YR2015]"])
+  };
+}
+
+// Some data from http://data.worldbank.org/data-catalog/country-profiles
+
+d3.tsv("CountryProfile.tsv", parseLine, function (error, data) {
+  
+  // Phase one: one row per variable/region pair
+  rawData = data;
+  
+  console.log("Code in the call-back function is only executed when the data file loads.");
+  
+  // Phase two: variable/region rows grouped by region
+  nestedData = d3.nest()
+  .key(function (d) { return d.Country; })
+  .entries(data);
+  
+  // Phase three: grouped variable/region rows summarized to single objects
+  countryData = nestedData.map(function (country) {
+    var result = { Country: country.key };
+    
+    country.values.forEach(function (d) {
+      if (d.Variable == "Population, total") {
+        result.Population = d.value;
+      }
+      else if (d.Variable == "GDP (current US$)") {
+        result.GDP = d.value;
+      }
+      else if (d.Variable == "Surface area (sq. km)") {
+        result.Area = d.value;
+      }
+      else if (d.Variable == "Internet users (per 100 people)") {
+        result.Internet = d.value;
+      }
+    });
+    
+    // Fix this here, rather than in the data file.
+    if (result.Country == "Qatar") {
+      result.GDP /= 1000000;
+    }
+    
+    return result;
+  });
+  
+  // Phase four: filter to remove regions with missing data
+  countryData = countryData.filter(function (d) { return d.Population && d.GDP; });
+  
+  var popExtent = d3.extent(countryData, function (d) { return d.Population; });
+  
+  popScale = d3.scaleLog()
+  .domain(popExtent)
+  .range([30, 370]);
+  
+  var gdpExtent = d3.extent(countryData, function (d) { return d.GDP; });
+  
+  gdpScale = d3.scaleLog()
+  .domain(gdpExtent)
+  .range([370, 30]);
+  
+  // Axes in d3 are powerful. We start by creating an axis with a visual orientation
+  //  and a scale function. This returns a new function.
+  var popAxis = d3.axisBottom(popScale);
+  
+  // Now we append a group element to the SVG and apply our axis function
+  //  to the group.
+  // Based on the domain and range of the scale the axis knows which
+  //  pixel values to start and end at, and what values to display.
+  // It doesn't know where we want to put it vertically, so we need to
+  //  translate it into place.
+  // Use the element inspector in your browser to see how the axis is
+  // being constructed. What SVG elements is it made up of?
+  svg.append("g")
+  .attr("transform", "translate(0, 370)")
+  .call(popAxis);
+  
+  // Calling axisLeft() tells D3 that the scale should be applied to the
+  //  vertical dimension, and that tick marks should go to the left of the 
+  //  axis line. We then just have to move it horizontally.
+  // Try commenting out the transform line to see what happens if you forget
+  //  to move it into place.
+  var gdpAxis = d3.axisLeft(gdpScale);
+  svg.append("g")
+  .attr("transform", "translate(30, 0)")
+  .call(gdpAxis);
+  
+  // Circles are popular but there are two rules:
+  //  1. Set your domain minimum to 0, not the data min.
+  //  2. Use a square root scale.
+  
+  // In this case the data min was so close to 0 (relatively) that it wasn't
+  //  clear that it was wrong. The difference between linear and sqrt scales
+  //  should be very visible if there's any variation.
+  var areaMax = d3.max(countryData, function (d) { return d.Area; });
+  var areaScale = d3.scaleSqrt()
+  .domain([0, areaMax]).range([1, 30]);
+  
+  // Linear scales are applicable to more than just pixel values.
+  // You can apply them to any aesthetic feature that's continuous, 
+  //  including color gradients.
+  // You can also create piece-wise linear scales
+  var internetScale = d3.scaleLinear()
+  .domain([0, 50, 100])
+  .range(["#000000", "#ff0000", "#0000ff"]);
+  
+  countryData.forEach(function (country) {
+    svg.append("circle")
+    .attr("cx", popScale(country.Population))
+    .attr("cy", gdpScale(country.GDP))
+    .attr("r", areaScale(country.Area))
+    .style("opacity", 0.3)
+    .style("fill", internetScale(country.Internet))
+    .on("mouseover", function () {
+      svg.select("#CountryName").text(country.Country);
+    });
+  });
+});
+
+console.log("Code after the d3.tsv() call is executed immediately.");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
