@@ -1,0 +1,150 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+path.lineGraph { fill: none; stroke-width: 2; }
+</style>
+</head>
+<body>
+<h3>&#x2764; Notes for Wednesday, February 14 &#x2764;</h3>
+
+<div>
+<ul>
+  <li>A tour through the <a href="https://queue.acm.org/detail.cfm?id=1805128">Data Visualization Zoo</a>.</li>
+  <li>Which Olympic sport has more <a href="https://fivethirtyeight.com/features/which-winter-olympic-sports-see-the-most-wipeouts/">wipeouts?</a></li>
+</ul>
+</div>
+
+<div>
+  <p>Lines, areas; the <a href="https://bl.ocks.org/mbostock/3808218">data join</a></p>
+  
+  <p>We're working with <a href="https://www.bls.gov/data/">Bureau of Labor Statistics data</a>, specifically the <a href="https://download.bls.gov/pub/time.series/sm/sm.data.33a.NewYork">CES series for New York state</a>. We're considering:</p>
+  <ul>
+    <li>Asynchronous data loading. </li>
+    <li>Data nesting and summarization. </li>
+    <li>Generation of path strings. </li>
+    <li>Seasonal adjustment.</li>
+    <li>Data dispersion.</li>
+  </ul>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="400">
+  <!-- Visual elements are represented by tags, which have attributes -->
+  <g id="plot">
+    <path class="lineGraph" />
+    <path class="lineGraph" />
+    <path class="lineGraph" />
+    <path class="lineGraph" />
+    <path class="lineGraph" />
+  </g>
+</svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+svg.append("text")
+.attr("id", "SectorName")
+.attr("x", 10)
+.attr("y", 28)
+.style("font-size", "18pt");
+
+// Scales and axis-generating functions
+var dateScale = d3.scaleTime().domain([new Date("1990-01-01"), new Date("2017-12-01")]).range([0, 350]);
+var dateAxis = d3.axisBottom(dateScale);
+var employmentScale = d3.scaleLinear().domain([0,2300]).range([350, 0]);
+var employmentAxis = d3.axisLeft(employmentScale);
+
+var sectorScale = d3.scaleOrdinal(d3.schemeCategory20);
+
+var plot = svg.select("#plot").attr("transform", "translate(40,30)");
+plot.append("g").call(dateAxis).attr("transform", "translate(0,350)");
+plot.append("g").call(employmentAxis).attr("transform", "translate(0,0)");
+
+var pathGenerator = d3.line()
+.x(function (d) { return dateScale(d.Date); })
+.y(function (d) { return employmentScale(d.Employment); });
+
+// Define variables outside the scope of the callback function.
+var rawData, nestedData;
+var seasonalData, unadjustedData;
+
+// This function will be applied to all rows. Select three columns, change names, and convert strings to numbers.
+function parseLine (line) {
+  line.Date = new Date(line.Date);
+  line.Employment = Number(line.Employment);
+  
+  return line;
+}
+
+d3.tsv("NYSEmployment.tsv", parseLine, function (error, data) {
+  rawData = data;
+  
+  console.log("Code in the call-back function is only executed when the data file loads.");
+
+  // Here we use the data manipulation primitive of grouping.
+  // We want to do this on two levels: adjustment and sector.
+  // Adjustment indicates whether the time-series has had seasonal
+  //  fluctuations removed or not.
+  nestedData = d3.nest()
+  .key(function (d) { return d.Adjusted; })
+  .key(function (d) { return d.SectorName; })
+  .entries(data);
+  
+  seasonalData = nestedData[0].values;
+  unadjustedData = nestedData[1].values;
+  
+  // Now we can switch between seasonally adjusted
+  //  data and raw data.
+  showTrends(seasonalData);
+});
+
+var paths;
+
+function showTrends(data) {
+  // Create or modify paths for each sector
+  
+  // This pattern is called the "data join". Think of it
+  // as ensuring that we have a one-to-one match between 
+  // data points and visible SVG elements.
+  
+  // Step 1: grab all existing paths, and add data
+  paths = plot.selectAll("path.lineGraph").data(data)
+  
+  // Step 2: check whether we have a path for each data element,
+  //  add any needed paths, and combine everything.
+  paths = paths.enter().append("path")
+  .attr("class", "lineGraph").merge(paths);
+  
+  // Set the aesthetic attributes.
+  paths.attr("d", function (sector) {
+    return pathGenerator(sector.values);
+  })
+  .attr("stroke", function (sector, i) {
+    return sectorScale(i);
+  });
+}
+
+
+console.log("Code after the d3.tsv() call is executed immediately.");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
