@@ -1,0 +1,147 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line.actualValue { stroke: #008837; stroke-width: 4; opacity: 0.3; stroke-dasharray: 1 6; stroke-linecap: round; }
+line.meanValue { stroke: #7b3294; stroke-width: 4; opacity: 0.3; }
+</style>
+</head>
+<body>
+<h3>Notes for Friday, February 23</h3>
+
+<div>
+  <p>Visual Perception</p>
+<ul>
+  <li>Looking for data? Andy Kirk has a <a href="http://www.visualisingdata.com/2017/02/archiving-collection-places-access-data/">comprehensive list of sources</a>.</li>
+  <li>Do pie charts really deserve <a href="https://twitter.com/maartenzam/status/835036238876930050">all</a> <a href="https://flowingdata.com/2008/09/19/pie-i-have-eaten-and-pie-i-have-not-eaten/">that</a> <a href="https://flowingdata.com/2014/12/01/pie-chart-pyramid/">hate</a>? <a href="https://eagereyes.org/papers/a-pair-of-pie-chart-papers">Maybe not</a>.</li>
+  <li>Let's find out for ourselves! Here we'll replicate studies by Cleveland and McGill (Science, 1985) and Heer and Bostock (CHI, 2010). <a href="https://goo.gl/forms/S5Tu0e920TqiXVtg2">Take this survey</a>.</li>
+  <li>Inspiration: <a href="https://fivethirtyeight.com/features/oscars-2018-here-are-our-final-predictions/">538's Oscar predictions</a>. Note the use of annotations. You are strongly encouraged to look at <a href="http://d3-annotation.susielu.com/">Susie Lu's annotations package</a>.</li>
+</ul>
+</div>
+
+<div>
+  <ul>
+    <li>Can we reverse-engineer human perception? </li>
+    <li>Melting turns wide data tables into narrow, long data tables. </li>
+    <li>Small multiples: repeat the same small plot over and over.</li>
+  </ul>
+</div>
+
+<div id="plots"></div>
+
+<script id="notes">
+
+
+var responses = [];
+var actualValues = {};
+
+var height = 75;
+var width = 150;
+var padding = 10;
+
+var xScale = d3.scaleLinear().domain([0,100]).range([0,width]);
+var yScale = d3.scaleLinear().domain([0,500]).range([height, 0]);
+
+// function to handle any row-by-row processing on TSV.
+//  "melt" the wide table into a tall narrow table.
+var parseForm = function(row) {
+  var timestamp = new Date(row["Timestamp"]);
+  Object.keys(row).forEach(function (key) {
+    if (key === "Timestamp") { return; }
+    responses.push({ Timestamp: timestamp, TypeQuestion: key, Value: Number(row[key]) });
+  });
+};
+
+var parseActual = function(row){
+  actualValues[row.Type + " " + row.Question] = Number(row.Value);
+};
+
+var binGenerator = d3.histogram().thresholds(20).domain([0,100]);
+var translate = function (x, y) { return "translate(" + x + "," + y + ")"; };
+
+function showPlots(error, form, actual) {
+  questionData = d3.nest().key(function (d) { return d.TypeQuestion; })
+  .entries(responses);
+  
+  questionData.forEach(function (question) {
+    var values = question.values.map(function (d) { return d.Value; });
+    var bins = binGenerator(values);
+    
+    var svg = d3.select("#plots").append("svg")
+    .attr("height", height + 2 * padding)
+    .attr("width", width + 2 * padding)
+    .attr("padding", "3px");
+    
+    svg.append("text").attr("x", 10).attr("y", 30).style("fill", "#aaa").text(question.key);
+    
+    var bars = svg.append("g").attr("transform", translate(padding, padding));
+    
+    // We can think of these rectangles as banners that we are hanging from the ceiling.
+    
+    bars.selectAll("rect").data(bins)
+    .enter().append("rect")
+    .attr("width", width / bins.length - 2)
+    .attr("height", function (d) {
+      return yScale(0) - yScale(d.length);
+    }) // Distance from the top of the bar to the floor
+    .attr("transform", function (d) {
+      return translate(xScale(d.x0), yScale(d.length));
+    }) // where should we hang the top of the rectangle?
+    .style("fill", "#7b3294");
+    
+    // I want the line showing the actual value to be visually
+    //  distinct from the bars, so I made it a different color and dotted.
+    // Look at the <style> block at the top of the page to see the CSS codes.
+    bars.append("line")
+    .attr("x1", xScale(actualValues[question.key])) // Fill these in...
+    .attr("x2", xScale(actualValues[question.key]))
+    .attr("y1", yScale(-5))
+    .attr("y2", yScale(500) + 5)
+    .attr("class", "actualValue");
+    
+    // For the mean of the reported values, I want the line to look as
+    // much like the data bars as possible so that people intuitively 
+    // guess that there's a connection, but different enough so that it 
+    // doesn't just look like another bar. So I'm making it solid and 
+    // the same purple color, but varying one property: opacity.
+    bars.append("line")
+    .attr("x1", xScale(d3.mean(values))) // And here too.
+    .attr("x2", xScale(d3.mean(values)))
+    .attr("y1", yScale(-5))
+    .attr("y2", yScale(505))
+    .attr("class", "meanValue");
+    
+  });
+  
+}
+
+// Uncomment this when I push the data files.
+
+d3.queue()
+.defer(d3.tsv, "responses.tsv", parseForm)
+.defer(d3.tsv, "actual.tsv", parseActual)
+.await(showPlots);
+
+
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
