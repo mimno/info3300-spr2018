@@ -1,0 +1,17 @@
+Each student: Get a note card.
+* On the FRONT, write your name, netid, and the best feedback you got on your project.
+
+* On the BACK, for three projects, write a short description of the project and feedback that you provided.
+
+Groups will present in one of FOUR phases, ~20 groups per phase.
+Each group: Flip a coin or run Math.round(Math.random()) TWO TIMES.
+Tails = 0; Heads = 1
+
+00: 11:20--11:30
+01: 11:30--11:40
+10: 11:40--11:50
+11: 11:50--12:00
+
+When you are presenting, find a spot in the front or along the aisle where people can gather.
+
+When you are NOT presenting, find a project and provide feedback.
