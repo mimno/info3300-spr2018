@@ -1,0 +1,227 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+text.label {
+  fill: #888;
+  font-size: x-small;
+  dominant-baseline: middle; 
+  text-anchor: middle;
+}
+
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, March 9</h3>
+
+<div>
+<ul>
+  <li>For Monday: have R and RStudio installed. The book <a href="https://newcatalog.library.cornell.edu/catalog/9798242">R for Data Science</a> will be useful (free online version through Cornell library).</li>
+  <li>In class: use <a href="https://goo.gl/forms/jmiBBpC0pmeYhzQH2">this form</a> to describe potential issues with two data sets that I will put on the screen. (Submissions before 11:30 will count as attendance.)</li>
+  <li>Data from <a href="https://ucr.fbi.gov/nibrs/2016/tables/data-tables">FBI uniform crime reporting</a> and the <a href="https://data.bls.gov/timeseries/CES0000000001?output_view=net_1mth">US Bureau of Labor Statistics</a>.</li>
+  <li><a href="http://en.wikipedia.org/wiki/Simple_linear_regression">Simple Linear Regression</a> and <a href="http://en.wikipedia.org/wiki/Least_squares">Least Squares</a>.</li>
+</ul>
+</div>
+
+<div>
+  <ul>
+    <li>The more-than-expected argument pattern</li>
+    <li>What is a model, and why is it useful?</li>
+    <li>What is a linear model? What makes a linear model good?</li>
+    <li>Which state has more vandals?</li>
+  </ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 30;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var normalGenerator = d3.randomNormal();
+var rounder = d3.format(".5g");
+
+var model = { intercept: 0, slope: 0 };
+var points;
+
+d3.tsv("fbi.txt", parseRow, callback);
+
+function parseRow(row) {
+  
+  row.x = Number(row["Population"]) / 1000;
+  row.y = Number(row["Destruction/Damage/Vandalism"]);
+  row.name = row["State"];
+  
+  return row;
+}
+
+var xScale, yScale, xExtent, yExtent;
+var circles, regressionLine, residuals, maxResidual, squaredResiduals, modelText;
+
+function callback(error, data) {
+  // Save outside the scope of the callback
+  points = data;
+  
+  model = leastSquares(points);
+
+  // The following two functions use equivalent syntax for inline functions
+  xExtent = d3.extent(points, function (d) { return d.x; });
+  yExtent = d3.extent(points, d => d.y);
+  
+  xScale = d3.scaleLinear().domain(xExtent).range([0, width]);
+  yScale = d3.scaleLinear().domain(yExtent).range([height, 0]);
+
+  circles = svg.selectAll("circle").data(points).enter()
+  .append("circle")
+  .attr("cx", function (d) { return xScale(d.x); })
+  .attr("cy", function (d) { return yScale(d.y); })
+  .attr("r", 5)
+  .style("opacity", 0.7);
+
+  texts = svg.selectAll("text").data(points).enter()
+  .append("text")
+  .attr("x", function (d) { return xScale(d.x) + 4; })
+  .attr("y", function (d) { return yScale(d.y); })
+  .style("opacity", 0.7)
+  .text(d => d.name);
+
+  regressionLine = svg.append("line")
+  .attr("class", "estimated")
+  .attr("x1", xScale(xExtent[0]))
+  .attr("y1", yScale(predict(model, xExtent[0])))
+  .attr("x2", xScale(xExtent[1]))
+  .attr("y2", yScale(predict(model, xExtent[1])))
+  .style("stroke", "#e41a1c");
+  
+  // calculate the difference between predicted y and actual y
+  calculateErrors(points, model);
+
+  residuals = svg.selectAll("path.residual").data(points).enter()
+  .append("path")
+  .attr("class", "residual")
+  .style("stroke", "none")
+  .attr("d", errorLine);
+
+  maxResidual = svg.selectAll("path.maxresidual").data(worstError(points)).enter()
+  .append("path")
+  .attr("class", "maxresidual")
+  .style("stroke", "none")
+  .attr("d", errorLine);
+
+  squaredResiduals = svg.selectAll("path.square").data(points).enter()
+  .append("path")
+  .attr("class", "square")
+  .style("opacity", 0.2)
+  .style("fill", "none")
+  .attr("d", errorSquare);
+  
+  residuals.style("stroke", "none");
+  maxResidual.style("stroke", "none");
+  squaredResiduals.style("fill", "none");
+  
+  modelText = svg.append("text")
+  .attr("id", "status")
+  .attr("x", 10).attr("y", 30)
+  .text("Slope: " + rounder(model.slope) + " Loss: " +
+  rounder(lossFunction()));
+}
+
+// Calculate the optimal slope and intercept.
+function leastSquares(points) {
+  var model = { intercept: 0, slope: 0 };
+
+  if (points.length == 0) { return model; }
+
+  var meanX = d3.mean(points, d => d.x);
+  var meanY = d3.mean(points, d => d.y);
+  
+  // Use the expression for beta hat from https://en.wikipedia.org/wiki/Simple_linear_regression
+  model.slope =
+    d3.sum(points, d => 0); // change this
+  model.slope /=
+    d3.sum(points, d => 1); // and this
+
+  model.intercept = meanY - model.slope * meanX;
+  return model;
+}
+
+function predict (model, x) {
+  return model.slope * x + model.intercept;
+}
+
+function calculateErrors(points, model) {
+  points.forEach(function (point) {
+    point.error = point.y - predict(model, point.x);
+  });
+}
+
+function worstError(points) {
+  var i = d3.scan(points, function (a, b) {
+    return Math.abs(b.error) - Math.abs(a.error);
+  });
+  return [points[i]];
+}
+
+function squaredError() {
+  return d3.sum(points, function (point) {
+    return point.error * point.error;
+  });
+}
+
+function absoluteError () {
+  return d3.sum(points, function (point) {
+    return Math.abs(point.error);
+  });
+}
+
+function maxError () {
+  return d3.max(points, function (point) {
+    return Math.abs(point.error);
+  });
+}
+
+var lossFunction = squaredError;
+
+function errorLine(point) {
+  // Return the path "d" string for a line from the
+  //  point to its predicted value
+  return "M" + xScale(point.x) + "," + yScale(point.y) + 
+  " L" + xScale(point.x) + "," + yScale(point.y - point.error);
+}
+
+function errorSquare(point) {
+  // Return the path "d" string for a square
+  return "M" + xScale(point.x) + "," + yScale(point.y) + 
+    " L" + xScale(point.error + point.x) + "," + yScale(point.y) +
+    " L" + xScale(point.error + point.x) + "," + yScale(point.y - point.error) +
+    " L" + xScale(point.x) + "," + yScale(point.y - point.error) +
+    "Z";
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
