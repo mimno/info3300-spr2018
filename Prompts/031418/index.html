@@ -1,0 +1,97 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+text.label {
+  fill: #888;
+  font-size: x-small;
+  dominant-baseline: middle; 
+  text-anchor: middle;
+}
+
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, March 14</h3>
+
+<div>
+<ul>
+  <li>Check out the <a href="https://www.nytimes.com/interactive/2018/03/13/us/elections/results-pennsylvania-house-special-election.html">New York Times election results view</a> (paywall)</li>
+  <li>We will replicate this plot in R, focusing on how the same processes are being implemented in different ways. Open the two R files in RStudio.</li>
+  <li>Have R and RStudio installed. The book <a href="https://newcatalog.library.cornell.edu/catalog/9798242">R for Data Science</a> will be useful (free online version through Cornell library).</li>
+  <li>Data from <a href="https://ucr.fbi.gov/nibrs/2016/tables/data-tables">FBI uniform crime reporting</a> and the <a href="https://data.bls.gov/timeseries/CES0000000001?output_view=net_1mth">US Bureau of Labor Statistics</a>.</li>
+  <li><a href="http://en.wikipedia.org/wiki/Simple_linear_regression">Simple Linear Regression</a> and <a href="http://en.wikipedia.org/wiki/Least_squares">Least Squares</a>.</li>
+</ul>
+</div>
+
+<div>
+  <ul>
+    <li>The negative result argument pattern</li>
+    <li>Selection specificity</li>
+    <li>Complicated data</li>
+    <li>Is the economy improving?</li>
+    <li>An example of the data join pattern in d3</li>
+  </ul>
+</div>
+
+<svg height="600" width="600">
+  <circle/>
+  <circle/>
+</svg>
+
+<script id="notes">
+
+// Here's a function that shows the contents of a d3 selection.
+function showSelection(tag, s) {
+  console.log("#" + tag + "#");
+  console.log("\tVisual Elements");
+  console.log(s.nodes());
+  console.log("\tData array");
+  console.log(s.data());
+  console.log("");
+}
+
+var svg = d3.select("svg");
+
+var circles = svg.selectAll("circle")
+.data([100, 200, 300, 400, 500]);
+showSelection("The initial selection only matches two numbers to two circles because there are two circles that currently exist", circles);
+showSelection("That selection's enter() selection contains the other three numbers, with empty placeholder elements", circles.enter());
+
+var addedCircles = circles
+.enter()
+.append("circle");
+showSelection("Calling append on the enter selection creates three new circles", addedCircles);
+
+showSelection("The original selection remains unchanged. It's enter() selection doesn't know about the new circles", circles.enter())
+
+var mergedCircles = addedCircles.merge(circles);
+showSelection("Once we merge the original selection and the append() selection, we have a one-to-one match for everything", mergedCircles);
+
+mergedCircles
+.attr("cx", function (d) { return d; })
+.attr("cy", function (d) { return d; })
+.attr("r", 5)
+.attr("id", function (d,i) { return "c" + i; });
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

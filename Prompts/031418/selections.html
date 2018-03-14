@@ -1,0 +1,49 @@
+<html>
+<head>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+</head>
+<body>
+  
+  <svg height="600" width="600">
+    <circle/>
+    <circle/>
+  </svg>
+  
+  <script>
+  
+  // Here's a function that shows the contents of a d3 selection.
+  function showSelection(tag, s) {
+    console.log("#" + tag + "#");
+    console.log("\tVisual Elements");
+    console.log(s.nodes());
+    console.log("\tData array");
+    console.log(s.data());
+    console.log("");
+  }
+  
+  var svg = d3.select("svg");
+  
+  var circles = svg.selectAll("circle")
+  .data([100, 200, 300, 400, 500]);
+  showSelection("The initial selection only matches two numbers to two circles because there are two circles that currently exist", circles);
+  showSelection("That selection's enter() selection contains the other three numbers, with empty placeholder elements", circles.enter());
+  
+  var addedCircles = circles
+  .enter()
+  .append("circle");
+  showSelection("Calling append on the enter selection creates three new circles", addedCircles);
+  
+  showSelection("The original selection remains unchanged. It's enter() selection doesn't know about the new circles", circles.enter())
+  
+  var mergedCircles = addedCircles.merge(circles);
+  showSelection("Once we merge the original selection and the append() selection, we have a one-to-one match for everything", mergedCircles);
+  
+  mergedCircles
+  .attr("cx", function (d) { return d; })
+  .attr("cy", function (d) { return d; })
+  .attr("r", 5)
+  .attr("id", function (d,i) { return "c" + i; });
+  
+  </script>
+</body>
+</html>
