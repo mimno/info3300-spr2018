@@ -1,0 +1,151 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+.domain { stroke: #ccc; }
+.tick line { stroke: #ccc; }
+.tick text { fill: #ccc; }
+@keyframes fadein {
+  0% { opacity: 0.0; }
+  30% { opacity: 0.0; }
+  100% { opacity: 1.0; }
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line.derivative { animation-name: fadein; animation-duration: 1s; }
+path.function {
+  stroke-dasharray: 10000;
+  stroke-dashoffset: 10000;
+  animation: draw 5s linear forwards;
+}
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, March 23</h3>
+
+<div>
+  <ul>
+    <li>Does <a href="https://www.washingtonpost.com/graphics/2018/national/early-spring">Spring come earlier now?</a> (paywall)</li>
+    <li>Why do we care about derivatives?</li>
+    <li>Why is squared loss everyone's favorite objective?</li>
+    <li>How do we handle interaction?</li>
+    <li>CSS <a href="https://www.w3schools.com/css/css3_animations.asp">animation</a>, including <a href="https://css-tricks.com/svg-line-animation-works/">a trick for lines that "draw themselves"</a>.</li>
+  </ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+// What are the largest and smallest data values?
+var extent = [-4, 4];
+
+var xScale = d3.scaleLinear().domain(extent).range([0, width]);
+var yScale = d3.scaleLinear().domain(extent).range([height, 0]);
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ yScale(0) + ")");
+svg.append("text").attr("x", width / 2).attr("y", height + 35).text("Input");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis)
+.attr("transform", "translate(" + xScale(0) + ", 0)");
+svg.append("text").attr("transform", "rotate(270)")
+.attr("x", -width / 2).attr("y", -25).text("Output");
+
+function vee(x) { return Math.abs(1.2 * x - 1.5) - 2; }
+function veeDerivative(x) {
+  return x > (1.5 / 1.2) ? 1.2 : -1.2;
+}
+
+function parabola(x) { return 0.2 * x * x + -0.5 * x - 3; }
+function parabolaDerivative(x) { return 2 * 0.2 * x - 0.5; }
+
+function cubic(x) { return 1.0 * x * x * x - 0 * x * x + -4 * x + 0; }
+function cubicDerivative(x) { return 3 * 1 * x * x + 2 * 0 * x + -4; }
+
+function drawPoint(x, f) {
+  svg.append("circle")
+  .attr("cx", xScale(x))
+  .attr("cy", yScale(f(x)))
+  .attr("r", 3)
+  .style("fill", "#7fc97f");
+}
+
+function drawFunction(f) {
+  var pathGenerator = d3.line()
+  .x(d => xScale(d.x))
+  .y(d => yScale(d.y));
+  
+  var step = (extent[1] - extent[0]) / 100; // (max - min) / steps
+  
+  // Generate values for evenly spaced points
+  var points = [];
+  for (var i = 0; i < 100; i++) {
+    var x = i * step + extent[0];
+    points.push({ x: x, y: f(x) });
+  }
+  
+  // Write a path
+  svg.append("path")
+  .attr("class", "function")
+  .attr("d", pathGenerator(points))
+  .style("stroke", "#7fc97f")
+  .style("stroke-width", 3)
+  .style("fill", "none")
+  .style("opacity", 0.5);
+}
+
+function drawDerivative(x, f, df) {
+  var dx = df(x);
+  
+  svg.append("line")
+  .attr("x1", xScale(x))
+  .attr("y1", yScale(f(x)))
+  .attr("x2", 0)
+  .attr("y2", 0) // What should these be?
+  .style("stroke", "#beaed4")
+  .style("stroke-width", 2)
+  .attr("class", "derivative");
+}
+
+var f = parabola;
+var df = parabolaDerivative;
+
+// Does this capture the right events? Why or why not?
+svg.on("click", function () {
+  var x = 0; // Set this
+  console.log(x, f(x));
+  drawPoint(x, f);
+});
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
