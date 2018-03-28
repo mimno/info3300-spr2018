@@ -1,0 +1,266 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+.domain { stroke: #ccc; }
+.tick line { stroke: #ccc; }
+.tick text { fill: #ccc; }
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+circle.red { fill: rgb(97,24,44);}
+circle.white { fill: rgb(212, 203, 107);}
+input.slider { width: 300px; }
+</style>
+</head>
+<body>
+<h3>Notes for Wednesday, March 28</h3>
+
+<div>
+  <ul>
+    <li>During class fill out <a href="https://goo.gl/forms/cAifrEewvsWL4YQ52">this form</a>.</li>
+    <li>Example projects from previous years.</li>
+    <li>Can we explain complicated algorithms through interaction and visualization?</li>
+    <li>What makes people like red (and white) wine? (See <tt>winequality.names.txt</tt> for source information.)</li>
+    <li>Optimizing a model with stochastic gradient updates</li>
+  </ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+// What are the largest and smallest data values?
+var extent = [-1, 11];
+
+var xScale = d3.scaleLinear().domain(extent).range([0, width]);
+var yScale = d3.scaleLinear().domain(extent).range([height, 0]);
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ yScale(-1) + ")");
+svg.append("text").attr("x", width / 2).attr("y", height + 35).text("Predicted Quality");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis)
+.attr("transform", "translate(" + xScale(-1) + ", 0)");
+svg.append("text").attr("transform", "rotate(270)")
+.attr("x", -width / 2).attr("y", -25).text("Recorded Quality");
+
+var normalGenerator = d3.randomNormal();
+var rounder = d3.format(".5g");
+
+var points = [];
+
+/*** Construct a linear model ***/
+
+var predictedVariable = "quality";
+var inputVariables = ["intercept", "fixed acidity","volatile acidity","citric acid","residual sugar","chlorides","free sulfur dioxide","total sulfur dioxide","density","pH","sulphates","alcohol"];
+
+var createModel = function () {
+  var model = { };
+  
+  inputVariables.forEach(function (variable) {
+    model[variable] = normalGenerator() * 0.01;
+  });
+  
+  model.predict = function (point) {
+    var prediction = 0.0;
+    inputVariables.forEach(function (variable) {
+      prediction += model[variable] * point[variable];
+    });
+    point["prediction"] = prediction;
+    return prediction;
+  }
+  
+  return model;
+}
+
+function calculateErrors(points, model) {
+  points.forEach(function (point) {
+    point.error = point[predictedVariable] - model.predict(point);
+  });
+}
+
+
+function squaredError() {
+  return d3.sum(points, function (point) {
+    return point.error * point.error;
+  });
+}
+
+var model = createModel();
+var lossFunction = squaredError;
+
+/*** Display and interact with the model ***/
+
+var regressionLine = svg.append("line")
+.attr("class", "estimated")
+.attr("x1", xScale(-1))
+.attr("y1", yScale(-1))
+.attr("x2", xScale(11))
+.attr("y2", yScale(11))
+.style("stroke", "#e41a1c")
+.style("stroke-width", 3)
+.style("opacity", 0.3);
+
+var modelText = svg.append("text")
+.attr("id", "status")
+.attr("x", 10).attr("y", 10)
+.text("Squared Error: " + rounder(lossFunction()));
+
+var slidersDiv = d3.select("#plot").append("div")
+.style("float", "left").style("margin-right", "10px");
+inputVariables.forEach(function (variable) {
+  var div = slidersDiv
+  .append("div");
+  
+  div.append("span")
+  .attr("id", "title_" + variable.replace(/ /g, "_"))
+  .text(variable);
+  
+  div.append("div")
+  .append("input").attr("type", "range").attr("class", "slider")
+  .attr("id", "slider_" + variable)
+  .attr("min", variable === "intercept" ? "-10.0" : "-0.6")
+  .attr("max", variable === "intercept" ? "10.0" : "0.6")
+  .attr("step", "0.02").attr("value", model[variable])
+  .on("input", function () {
+    model[variable] = Number(this.value);
+    display();
+  });
+});
+
+/*** Load data with an unusual field delimiter ***/
+var semicolonFormat = d3.dsvFormat(";");
+
+d3.request("winequality-red.csv")
+.response(function (response) {
+  rawText = response.responseText;
+  return semicolonFormat.parse(response.responseText, stringsToNumbers);
+})
+.get(initialize);
+
+function jitter() { return 20 * (Math.random() - 0.5); }
+function stringsToNumbers(row) {
+  row["intercept"] = 1.0;
+  row["jitter"] = jitter();
+  var fieldNames = Object.keys(row);
+  for (var i = 0; i < fieldNames.length; i++) {
+    row[fieldNames[i]] = Number(row[fieldNames[i]]);
+  }
+  return row;
+}
+
+function initialize(error, data) {
+  points = data;//.filter(function () { return Math.random() < 0.15; });
+  
+  var variableMean = {};
+  var variableStdDev = {};
+  
+  inputVariables.forEach(function (variable) {
+    variableMean[variable] = d3.mean(points, function (d) { return d[variable]; });
+    variableStdDev[variable] = d3.deviation(points, function (d) { return d[variable]; });
+  });
+  
+  points.forEach(function (point) {
+    inputVariables.forEach(function (variable) {
+      if (variable !== "intercept") {
+        // Normalize inputs
+        point[variable] -= variableMean[variable];
+        point[variable] /= variableStdDev[variable];
+      }
+    });
+  });
+  
+  
+  display();
+}
+
+function calculateGradient(points, model) {
+  var gradient = {};
+  inputVariables.forEach(function (variable) {
+    gradient[variable] = 0.0;
+  });
+  
+  points.forEach(function (point) {
+    inputVariables.forEach(function (variable) {
+      // What goes here?
+      
+    });
+  });
+  
+  // Update the slider display
+  inputVariables.forEach(function (variable) {
+    var id = "#title_" + variable.replace(/ /g, "_");
+    
+    if (gradient[variable] > 0.0) {
+      d3.select(id).html(variable + " &#x2192;");
+    }
+    else if (gradient[variable] < 0.0) {
+      d3.select(id).html("&#x2190; " + variable);
+    }
+    else {
+      d3.select(id).html(variable);
+    }
+  });
+  
+  return gradient;
+}
+
+function updateModel(model, gradient, learningRate) {
+  inputVariables.forEach(function (variable) {
+    // What goes here?
+    
+  });
+  display();
+}
+
+function display() {
+  calculateErrors(points, model);
+
+  var circles = svg.selectAll("circle").data(points);
+  
+  circles.enter()
+  .append("circle")
+  .merge(circles)
+  .attr("r", 5)
+  .attr("class", "red")
+  .style("opacity", 0.4)
+  .attr("cx", function (d) { return xScale(d["prediction"]); })
+  .attr("cy", function (d) { return yScale(d[predictedVariable]) + d.jitter; });
+
+  modelText
+  .text("Squared Error: " + rounder(lossFunction()));
+  
+  inputVariables.forEach(function (variable) {
+    d3.select("#slider_" + variable)
+    .property("value", model[variable]);
+  });
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
