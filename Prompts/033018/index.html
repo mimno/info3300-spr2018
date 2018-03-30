@@ -1,0 +1,150 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; background-color: #888888; }
+text { cursor: pointer; }
+</style>
+</head>
+<body>
+<h3>Prompt for Friday March 30. Force directed layouts.</h3>
+
+<div>
+<ul>
+  <li>Today's <a href="https://goo.gl/forms/DgbDuE6ytvTbQ04A2">form</a></li>
+  <li>Comment on this <a href="http://sienaduplan.com/data/interns/">diagram of universities and internships</a> by <a href="http://sienaduplan.com/data/">Siena Duplan</a>.</li>
+  <li>We usually set the x,y positions of visual elements from data. But sometimes we want to give suggestions rather than absolute positions. Today we'll do this using physics simulations.</li>
+  <li>I've modified the code so that it does the simulation "silently" before laying out any of the visible elements. This mode allows you to define a force-directed layout that looks like a static layout.</li>
+  <li>See the d3 <a href="https://github.com/d3/d3-force">force layout</a> documentation.</li>
+</ul>
+</div>
+
+<div>
+  <ul>
+    <li>For this example: <a href="https://flowingdata.com/2016/09/08/beeswarm-plot-in-r-to-show-distributions/">beeswarm layout</a></li>
+    <li>Gaussian vs. Dirichlet process Gaussian</li>
+  </ul>
+</div>
+
+<div id="plot">
+  <svg></svg>
+</div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+var extent = 3;
+
+// Map data to visual properties
+var xScale = d3.scaleLinear().domain([-extent, extent]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-extent, extent]).range([height, 0]);
+var rScale = d3.scaleSqrt().domain([0, 10]).range([0, 15]);
+var fillScale = d3.scaleLinear().domain([-extent, 0, extent]).range(['#fc8d59','#ffffbf','#91bfdb'])
+
+var gaussian = d3.randomNormal();
+var logNormal = function () { return Math.exp(gaussian() + 1.0); }
+
+var lazyGaussian = function (list) {
+  // Sample MORE than the current length of the list
+  var j = Math.floor( Math.random() * (list.length + 1) ); 
+  if (list.length == 0 || j >= list.length) {
+    // If we picked the last index, sample a new value
+    return gaussian();
+  }
+  else {
+    // Otherwise copy the previous existing value
+    return list[j].a;
+  }
+}
+
+/* Beeswarm simulator. Circles will try to move themselves so that they are near
+    the middle vertically and lined up according to their "a" value horizontally. */
+
+var svg = d3.select("svg").attr("height", height).attr("width", width);
+
+// Create data structures containing nodes and edges between them.
+
+var nodes = [];
+
+for (var i = 0; i < 120; i++) {
+  nodes.push({
+    "id": i,
+    "a": gaussian(),
+    "b": logNormal()
+  });
+}
+
+// Create a d3 force simulation
+
+// Define the physics of the simulation
+var simulation = d3.forceSimulation();
+// Add forces here. Consult the docs: https://github.com/d3/d3-force
+
+// Tell the simulation about the nodes, attach a self-moving event, and stop it so we can run it manually.
+simulation
+.nodes(nodes)
+.on("tick", updateDisplay);
+
+// Create circles for nodes.
+var circles = svg.selectAll("circle").data(nodes).enter().append("circle")
+.attr("r", function (d) { return rScale(d.b); })
+.style("fill", function (d) { return fillScale(d.a); })
+.style("opacity", 0.95);
+
+// Move the circles to their locations.
+updateDisplay();
+
+function updateDisplay() {
+  circles
+  .attr("cx", function(d) { return d.x; })
+  .attr("cy", function(d) { return d.y; });
+}
+
+// Add click/drag functions
+// From https://bl.ocks.org/mbostock/2675ff61ea5e063ede2b5d63c08020c7
+circles
+.call(d3.drag()
+.on("start", dragstarted)
+.on("drag", dragged)
+.on("end", dragended));
+
+function dragstarted(d) {
+  if (!d3.event.active) { simulation.alphaTarget(0.3).restart() };
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) { simulation.alphaTarget(0) };
+  d.fx = null;
+  d.fy = null;
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
