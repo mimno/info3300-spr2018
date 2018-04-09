@@ -1,0 +1,233 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, April 9</h3>
+
+<div>
+<ul>
+  <li><a href="https://goo.gl/forms/A92HjlnRCpHAzIOI3">In-class form</a></li>
+  <li>Have project prototypes ready for Wednesday.</li>
+  <li>Why clustering? <a href="https://fivethirtyeight.com/features/the-four-types-of-vin-diesel-movies/">Vin Diesel movies</a>.</li>
+  <li>Another view of <a href="http://bl.ocks.org/blacki/ebba08223eba20b56b62">k-means equilibria</a>.</li>
+</ul>
+</div>
+
+<div>
+  <ul>
+    <li>Can we use interaction and visualization to demonstrate an algorithm?</li>
+    <li>True distributions and model distributions.</li>
+    <li>Can we find groups of data points automatically?</li>
+    <li>Is this hard? Clustering and variability.</li>
+    <li>How do we know if we've done a good job?</li>
+  </ul>
+</div>
+
+<div id="plot">
+<p>
+  <button id="findclosest">Assign Points</button>
+  <button id="movemeans">Update Centroids</button>
+</p>
+</div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+// This function will behave like Math.random(), but everyone will get 
+//  the same random numbers in the same order, so we can try to fit the
+//  same original clusters.
+// From http://stackoverflow.com/questions/521295/javascript-random-seeds
+var seed = 3;
+function seededRandom() {
+  var x = Math.sin(seed++) * 10000;
+  return x - Math.floor(x);
+}
+
+var svg = d3.select("#plot").append("svg").attr("height", height).attr("width", width);
+
+// Create a "blur" filter
+svg.append("defs")
+.append("filter").attr("id", "blur")
+.attr("x", "-50%").attr("y", "-50%")
+.attr("height", "200%").attr("width", "200%")
+.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", 10);
+
+var points, lines, circles
+var centroids, centroidCircles;
+
+var gaussian = d3.randomNormal();
+
+var xScale = d3.scaleLinear().domain([0,1]).range([padding, width - padding]);
+var yScale = d3.scaleLinear().domain([0,1]).range([height - padding, padding]);
+
+// First we define a real data generating process:
+points = makeRealClusters(1, 0, 0.1);
+
+// Then make a clustering model that tries to approximate it
+//centroids = kMeansModel(1);
+
+function makeRealClusters(numRealClusters, pointsPerCluster, spread) {
+  var points = [];
+  
+  for (var clusterID = 0; clusterID < numRealClusters; clusterID++) {
+    var center = { x: seededRandom(), y: seededRandom() };
+
+    // Place a blurry indication of where the cluster "should" be.
+    svg.append("circle")
+    .attr("class", "realCenter")
+    .attr("cx", xScale(center.x))
+    .attr("cy", yScale(center.y))
+    .attr("r", xScale(spread) - xScale(0))
+    //.attr("filter", "url(#blur)")
+    .style("fill", "#9c9");
+    
+    // Sample points from this cluster
+    for (var i = 0; i < pointsPerCluster; i++) {
+      // Data
+      points.push({
+        cluster: -1,
+        x: center.x + gaussian() * spread, // "noise" is scaled by "spread" param
+        y: center.y + gaussian() * spread
+      });
+      
+      // Visual representation
+      svg.append("circle")
+      .attr("class", "point")
+      .attr("cx", function(d) { return xScale(center.x); })
+      .attr("cy", function(d) { return yScale(center.y); })
+      .attr("r", 3)
+      .style("fill", "green")
+      .style("opacity", 0.5)
+    }
+  }
+  
+  // Implement "pop out" effect to emphasize origin clusters
+  circles = svg.selectAll(".point").data(points)
+  .transition().duration(1000)
+  .attr("cx", function(d) { return xScale(d.x); })
+  .attr("cy", function(d) { return yScale(d.y); });
+
+  // Create lines that will connect points to their assigned cluster
+  lines = svg.selectAll("line").data(points);
+
+  lines = lines.enter().append("line")
+  .attr("x1", function(d) { return xScale(d.x); })
+  .attr("y1", function(d) { return yScale(d.y); })
+  .attr("x2", function(d) { return xScale(d.x); })
+  .attr("y2", function(d) { return yScale(d.y); })
+  .style("stroke", "#aaa").merge(lines);
+  
+  return points;
+}
+
+// Now we define a model that we hope is close to the real 
+//  data generating process:
+
+function kMeansModel(numAssumedClusters) {
+  var centroids = new Array(numAssumedClusters);
+  for (var i = 0; i < centroids.length; i++) {
+    centroids[i] = { x: seededRandom(), y: seededRandom() };
+  }
+
+  centroidCircles = svg.selectAll(".centroid").data(centroids);
+
+  centroidCircles = centroidCircles.enter().append("circle")
+  .attr("class", "centroid")
+  .attr("r", 5)
+  .style("fill", "orange").merge(centroidCircles);
+
+  centroidCircles
+  .attr("cx", function(d) { return xScale(d.x); })
+  .attr("cy", function(d) { return yScale(d.y); });
+  
+  return centroids;
+}
+
+function moveMeans() {
+  centroids.forEach(function (centroid, i) {
+    var assignedPoints = 
+      points.filter(function (point) { return point.cluster == i; });
+    
+    // How do we update the centroids if we know how 
+    //  they relate to data points?
+      // STEP 3
+  });
+  
+  lines.transition().duration(1000).attr("x2", function (point) {
+    return xScale(centroids[point.cluster].x);
+  })
+  .attr("y2", function (point) {
+    return yScale(centroids[point.cluster].y);
+  });
+  
+  centroidCircles.transition().duration(1000)
+  .attr("cx", function(d) { return xScale(d.x); })
+  .attr("cy", function(d) { return yScale(d.y); });
+}
+
+function findClosest() {
+
+  points.forEach(function (point) {
+    point.cluster = nearestCenter(point);
+  });
+  
+  lines.transition().duration(1000).attr("x2", function (point) {
+    return xScale(centroids[point.cluster].x);
+  })
+  .attr("y2", function (point) {
+    return yScale(centroids[point.cluster].y);
+  });
+
+}
+
+// A helper function that calculates the distance to each
+//  cluster center
+function nearestCenter(point) {
+  var nearest;
+  var shortestDistance = Number.MAX_VALUE;
+  for (var i = 0; i < centroids.length; i++) {
+    var c = centroids[i];
+    var distance = Math.sqrt( 
+      (c.x - point.x) * (c.x - point.x) +
+      (c.y - point.y) * (c.y - point.y)
+    );
+  
+    if (distance < shortestDistance) {
+      shortestDistance = distance;
+      nearest = i;
+    }
+  }
+  return nearest;
+}
+
+d3.select("#movemeans").on("click", moveMeans);
+d3.select("#findclosest").on("click", findClosest);
+
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
