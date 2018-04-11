@@ -1,0 +1,21 @@
+Project checklist:
+
+☐ Search your code for URLs that start with "/". These will *not* *work* when we run your project in a subdirectory of the document root.
+
+☐ If the goal of the project is for us to compare two quantities, are the visual elements that represent those quantities easy to compare? Don't make us use our short-term memory.
+
+☐ Download and cache any data from 3rd-party APIs. These almost always break, and we will not debug.
+
+☐ Put your work in front of someone who has never seen it or heard you say anything about it. Ask them to describe what they see and watch what they do.
+
+☐ Make sure that anything that we're supposed to interact with is obviously interactable.
+
+☐ When the project loads, do we know immediately (within a fraction of a second) what is important and what we should focus on? Are colors and animation being used carefully and purposefully?
+
+☐ If you have circles with varying radii, use scaleSqrt().
+
+☐ Use round or meaningful numbers whenever possible. We don't like guides that tell us the color associated with 2867.885178311478.
+
+☐ Verify that the zip file you turn in is openable and runnable on another computer. Make sure all data and script files are present.
+
+☐ Are you using more than ~7 colors to represent categories?
