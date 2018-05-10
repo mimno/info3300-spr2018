@@ -1,0 +1,375 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: Univers, Helvetica, 'Open Sans', Calibri, sans-serif; background: #333; color: rgb(229, 177, 58); }
+svg {  }
+button { font-family: Univers, Helvetica, 'Open Sans'; background-color: #333; color: rgb(229, 177, 58); border: solid rgb(229, 177, 58) 1px ;}
+a { color: rgb(229, 177, 58); }
+.axis path { stroke: #777; fill: none; }
+.axis line { stroke: #777; fill: none; }
+.axis text { fill: none; font-size: xx-small; }
+circle.real { fill: #77f; opacity: 0.5; }
+circle.replicated { fill: #f00; opacity: 0.0; }
+
+@keyframes resample {
+  from { opacity: 0.5; }
+  85% { opacity: 0.5; }
+  to { opacity: 0.0; }
+}
+
+@keyframes lightsaber {
+  from { stroke-width: 5; }
+  50% { stroke-width: 5.25; }
+  to { stroke-width: 5; }
+}
+
+
+/* Inspired by:
+https://github.com/scotch-io/Pure-CSS3-Star-Wars-Lightsaber-Checkboxes
+*/
+line.real {
+  stroke: rgba(12, 144, 244, 1);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.9;
+  /*
+  animation-name: lightsaber;
+  animation-duration: 2s;
+  animation-iteration-count: infinite;
+  */
+}
+
+.replicated {
+  stroke: rgba(229, 17, 21, 1);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.9;
+  /*
+  animation-name: lightsaber;
+  animation-duration: 2s;
+  animation-iteration-count: infinite;
+  */
+}
+</style>
+</head>
+<body>
+<h3>Notes for Wednesday, May 2 (to prepare you for May the Fourth)</h3>
+
+<div>
+<ul>
+  <li><a href="https://goo.gl/forms/U25xXAGdY799KI5G3">Today's form</a></li>
+  <li>Project 2 longer read: <a href="dairydiaries.herokuapp.com">Dairy Diaries</a>.</li>
+  <li><a href="http://en.wikipedia.org/wiki/Simple_linear_regression">Simple Linear Regression</a> and <a href="https://en.wikipedia.org/wiki/Fisher%27s_exact_test">permutation tests</a></li>
+</ul>
+</div>
+
+<div>
+  <ul>
+    <li>Many visual presentations include <i>models</i> -- lines or clusterings or some other visual element that is derived from data and summarizes data but is not itself given in the data file. Lines can be very powerful. They draw your eye to trends that might not be visible easily from a noisy scatter plot.</li>
+    <li>But how do we know that these are meaningful? Often we hear about "p values" or "t tests", but in my experience even students who have studied these concepts have difficulty describing what they mean or why they are important. In this example we'll see that the p-value for a linear regression slope gives almost exactly the same result as a simple computational procedure.</li>
+    <li>A simple x/y linear model argues that knowing the x value for an observation should tell you something about the y value for that observation. If that's true, we can estimate the strength of that relationship by calculating the slope of the linear regression between x and y from all the x,y pairs in the data set. The problem is, if it's not true, we can still calculate a slope, and with finite, noisy data, it's very unlikely that the slope will be exactly zero.</li>
+    <li>What we can do is a "permutation test" that simulates what a similar dataset would look like if there were no relationship between x and y. We keep all the same x's and the same y's, but shuffle the pairs of values. Doing this repeatedly and recording the linear regression line we get each time gives us a visual representation of what slopes we might expect for a data set with the same x and y values but no relationship.</li>
+    <li>If the red permuted linear model lines cover up the original blue model line, then the original model falls with the range that we would expect to see by random chance, given the variability of the dataset. The result may still be interesting, and even statistically significant, but it is less convincing. If the original model sits far outside the range of the replicated lines, the result is statistically significant.</li>
+    <li>This brings us back to p-values. The function at the bottom of the page calculates the p-value for a given dataset, in a way that would take several weeks of grad-level math statistics to explain. But as you add more and more permutations of the data, the proportion of slopes that are steeper (up OR down) than the original model's slope should converge to something very close to the p-value. </li>
+    <li>Try different numbers of samples, change the true slope, and add more or less noise. How does the p-value and the appearance of the permutation tests change?</li>
+  </ul>
+</div>
+
+<div id="header">
+<button id="permute">Resample</button>
+<button id="clear">Clear</button>
+<div>
+<div>Replications: <span id="reps"></span></div>
+<div>Slope (real): <span id="slope"></span>; 90% Conf Int: [<span id="slope05"></span> , <span id="slope95"></span>]; p-value: [<span id="pvalue"></span>]; permutation: [<span id="permutation"></span>]</div>
+</div>
+</div>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var blur = svg.append("defs")
+.append("filter")
+.attr("id", "lightsaberglow")
+.attr("x", "-50%").attr("y", "-50%")
+.attr("width", "400%").attr("height", "400%");
+
+blur.append("feGaussianBlur")
+.attr("result", "blurOut")
+.attr("in", "offOut")
+.attr("stdDeviation", 5);
+
+blur.append("feBlend")
+.attr("in", "SourceGraphic")
+.attr("in2", "blurOut")
+.attr("mode", "normal")
+
+var xExtent = [-3, 3];
+var yExtent = [-3, 3];
+
+var xScale = d3.scaleLinear().domain(xExtent).range([0, width]);
+var yScale = d3.scaleLinear().domain(yExtent).range([height, 0]);
+
+// Helper functions to be used as callbacks
+var x = function (point) { return xScale(point.x); }
+var y = function (point) { return yScale(point.y); }
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ yScale(0) + ")").attr("class", "axis");
+svg.append("text").attr("x", width * 0.4).attr("y", height + 35).text("Input Variable");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis).attr("class", "axis").attr("transform", "translate("+ xScale(0) + ",0)");
+svg.append("text").attr("transform", "rotate(270) translate(-200, -24)").text("Prediction");
+
+// Plot a line from a linear model
+var line = function(model, delay, type) {
+  svg.append("line").attr("class", type).style("opacity", 0)
+  .attr("x1", xScale(xExtent[0])).attr("y1", yScale(xExtent[0] * model.slope + model.intercept))
+  .attr("x2", xScale(xExtent[1])).attr("y2", yScale(xExtent[1] * model.slope + model.intercept))
+  .attr("filter", "url(#lightsaberglow)")
+  .transition().delay(delay).style("opacity", 1.0);
+}
+
+var normalGenerator = d3.randomNormal();
+var uniformGenerator = function () {
+  return 5 * (Math.random() - 0.5);
+}
+
+// Sample 2D points from a noisy linear model
+function generateFrom(intercept, slope, noise, n) {
+  var points = [];
+  
+  for (var i = 0; i < n; i++) {
+    var x = uniformGenerator();
+    var y = x * slope + intercept + noise * normalGenerator(); 
+    points.push({ x: x, y: y });
+  }
+  
+  return points;
+}
+
+// Calculate the optimal slope and intercept.
+function leastSquares(points) {
+  var model = { intercept: 0, slope: 0 };
+
+  if (points.length == 0) { return model; }
+
+  var meanX = d3.mean(points, function (d) { 
+    return d.x;
+  });
+
+  var meanY = d3.mean(points, function (d) { 
+    return d.y;
+  });
+  
+  var sumSquaredX = d3.sum(points, function (d) {
+    return (d.x - meanX) * (d.x - meanX);
+  });
+  
+  model.slope = d3.sum(points, function (d) {
+    return (d.x - meanX) * (d.y - meanY);
+  });
+  model.slope /= d3.sum(points, function (d) {
+    return (d.x - meanX) * (d.x - meanX);
+  });
+
+  model.intercept = meanY - model.slope * meanX;
+  
+  // Add up the squared errors
+  var sumSquaredErrors = d3.sum(points, function (d) {
+    var error = d.y - (model.slope * d.x + model.intercept);
+    return error * error;
+  });
+  
+  // Here's where we compute the statistic that we pass to the pValue function.
+  model.standardError = Math.sqrt(sumSquaredErrors / ( (points.length - 2) * sumSquaredX));
+  model.p = (1.0 - pValue(Math.abs(model.slope) / model.standardError, points.length - 2));
+  
+  return model;
+}
+
+var realCircles, replicatedCircles, realModel;
+var slopes;
+var intercepts;
+var threeDigits = d3.format(".3f");
+var sixDigits = d3.format(".6f");
+
+function init() {
+  // Reset everything
+  d3.selectAll("line.real").remove();
+  d3.selectAll("line.replicated").remove();
+  d3.selectAll("circle").remove();
+  slopes = [];
+  intercepts = [];
+
+  // Plot the real points
+  realCircles = svg.selectAll("circle.real")
+  .data(points).enter().append("circle")
+  .attr("class", "real")
+  .attr("cx", x).attr("cy", y)
+  .attr("r", 4);
+
+  // Plot the replicated points
+  replicatedCircles = svg.selectAll("circle.replicated")
+  .data(points).enter().append("circle")
+  .attr("class", "replicated")
+  .attr("cx", x).attr("cy", y)
+  .attr("r", 4)
+  .style("animation-name", "");
+
+  // Get the best linear fit for the real data
+  realModel = leastSquares(points);
+  line(realModel, 0, "real");
+  
+  d3.select("#reps").text(0);
+  d3.select("#slope").text(threeDigits(realModel.slope));
+  d3.select("#slope05").text("");
+  d3.select("#slope95").text("");
+  d3.select("#pvalue").text(sixDigits(realModel.p));
+}
+
+// For example, fifth percentile (0.05) of a list of length 20 should be index 1.
+// Related: https://gist.github.com/IceCreamYou/6ffa1b18c4c8f6aeaad2
+function percentile(list, p) {
+  var n = list.length;
+  if (p <= 1.0 / (n+1)) {
+    return list[0]
+  }
+  else if (p >= n / (n+1)) { 
+    return list[n-1];
+  }
+  else {
+    // Return a weighted combination
+    var integer = Math.floor(p * (n+1)); 
+    var fraction = (p * (n+1)) % 1;
+    console.log(integer, fraction, n);
+    return (1.0 - fraction) * list[ integer-1 ] + 
+      fraction * list[ integer ];
+  }
+}
+
+var steeperSlopes = 0;
+var points = generateFrom(0.0, -0.3, 1.0, 30);
+
+// Sample a new dataset from the original dataset, with replacement.
+function permute() {
+  var randomizedPoints = [];
+  var shuffledYs = d3.shuffle(points.map(d => d.y));
+  
+  for (var i = 0; i < points.length; i++) {
+    // How do we sample with replacement?
+    randomizedPoints.push(
+      { x: points[i].x, y: shuffledYs[i] }
+    );
+  }
+  
+  // Show data points moving to new locations
+  replicatedCircles.data(randomizedPoints)
+  .transition().duration(1500)
+  .attr("cx", x).attr("cy", y)
+  .style("animation-name", "resample")
+  .style("animation-duration", "4s");
+  
+  // Calculate the resulting model
+  var replicatedModel = leastSquares(randomizedPoints);
+  line(replicatedModel, 2000, "replicated");
+  
+  if (Math.abs(replicatedModel.slope) > Math.abs(realModel.slope)) {
+    steeperSlopes += 1;
+  }
+  
+  // Remove the CSS animation
+  replicatedCircles.data(points)
+  .transition().delay(4000)
+  .style("animation-name", "")
+  .attr("cx", x).attr("cy", y);
+  
+  slopes.push(replicatedModel.slope);
+  slopes.sort(function(a, b) { return a - b });
+  
+  intercepts.push(replicatedModel.intercept);
+  intercepts.sort(function(a, b) { return a - b });
+
+  d3.select("#reps").text(slopes.length);
+  d3.select("#slope05")
+  .transition().delay(4000)
+  .text(threeDigits(percentile(slopes, 0.05)));
+  
+  d3.select("#slope95")
+  .transition().delay(4000)
+  .text(threeDigits(percentile(slopes, 0.95)));
+  
+  d3.select("#permutation")
+  .transition().delay(4000)
+  .text(sixDigits(0.5 * steeperSlopes / slopes.length));
+  
+}
+
+init();
+d3.select("#clear").on("click", init);
+d3.select("#permute").on("click", permute);
+
+// Here's some ugly statistics code. I don't expect anyone to understand 
+//  what this is doing, but you're welcome to try!
+// Also: it is not 1968. Never write code like this.
+function pValue(t, df) {
+  // JS translated from Java translated from C translated from FORTRAN
+  //  originally published in a Stats Journal when LBJ was president:
+  // ALGORITHM AS 3  APPL. STATIST. (1968) VOL.17, P.189
+  // Computes P(T<t)
+  var a,b,idf,im2,ioe,s,c,ks,fk,k;
+  var g1=0.3183098862;// =1/pi;
+  idf=df;
+  a=t/Math.sqrt(idf);
+  b=idf/(idf+t*t);
+  im2=df-2;
+  ioe=idf%2;
+  s=1;
+  c=1;
+  idf=1;
+  ks=2+ioe;
+  fk=ks;
+  if(im2>=2) {
+    for(k=ks;k<=im2;k+=2) {
+      c=c*b*(fk-1)/fk;
+      s+=c;
+      if(s!=idf) {
+        idf=s;
+        fk+=2;
+      }
+    }
+  }
+  if(ioe!=1)
+    return 0.5+0.5*a*Math.sqrt(b)*s;
+  if(df==1) s=0;
+  return 0.5+(a*b*s+Math.atan(a))*g1;
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>
